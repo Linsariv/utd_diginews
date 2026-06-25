@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/di/injection.dart';
+import 'core/routing/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,16 +15,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'UTD DigiNews',
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('UTD DigiNews'),
-        ),
-        body: const Center(
-          child: Text('DigiNews Offline First'),
-        ),
-      ),
+    return MaterialApp.router(
+      routerConfig: appRouter,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
