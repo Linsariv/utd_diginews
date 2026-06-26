@@ -1,6 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../models/news_model.dart';
 import 'news_remote_datasource.dart';
+import '../../../core/config/api_config.dart';
 
 class NewsRemoteDatasourceImpl implements NewsRemoteDatasource {
   final ApiClient apiClient;
@@ -10,10 +11,10 @@ class NewsRemoteDatasourceImpl implements NewsRemoteDatasource {
   @override
   Future<List<NewsModel>> getTopHeadlines() async {
     final response = await apiClient.dio.get(
-      'top-headlines',
+      ApiConfig.topHeadlines,
       queryParameters: {
         'country': 'id',
-        'apikey': 'API_KEY_KAMU',
+        'apikey': ApiConfig.apiKey,
       },
     );
 

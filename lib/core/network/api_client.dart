@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../config/api_config.dart';
 
 class ApiClient {
   late final Dio dio;
@@ -6,7 +7,7 @@ class ApiClient {
   ApiClient() {
     dio = Dio(
       BaseOptions(
-        baseUrl: 'https://gnews.io/api/v4/',
+        baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
       ),
