@@ -1,22 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-class HomePage extends StatelessWidget {
+import '../bloc/news/news_bloc.dart';
+import '../bloc/news/news_event.dart';
+import '../bloc/news/news_state.dart';
+
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+
+  @override
+  void initState() {
+    super.initState();
+
+    context.read<NewsBloc>().add(
+      GetNewsEvent(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('UTD DigiNews'),
+        title: const Text("DigiNews"),
       ),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () {
-            context.push('/about');
-          },
-          child: const Text('Go To About'),
-        ),
+      body: BlocBuilder<NewsBloc, NewsState>(
+        builder: (context, state) {
+
+          if (state is NewsLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (state is NewsLoaded) {
+            return Center(
+              child: Text(
+                "Total berita: ${state.news.length}",
+                style: const TextStyle(
+                  fontSize: 20,
+                ),
+              ),
+            );
+          }
+
+          if (state is NewsError) {
+            return Center(
+              child: Text(state.message),
+            );
+          }
+
+          return const SizedBox();
+        },
       ),
     );
   }
