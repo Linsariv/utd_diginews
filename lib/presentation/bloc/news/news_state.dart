@@ -1,5 +1,4 @@
-import 'package:equatable/equatable.dart';
-import '../../../domain/entities/news_entity.dart';
+part of 'news_bloc.dart';
 
 abstract class NewsState extends Equatable {
   const NewsState();

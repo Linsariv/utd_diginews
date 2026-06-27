@@ -1,4 +1,4 @@
-import 'package:equatable/equatable.dart';
+part of 'news_bloc.dart';
 
 abstract class NewsEvent extends Equatable {
   const NewsEvent();
@@ -8,3 +8,12 @@ abstract class NewsEvent extends Equatable {
 }
 
 class GetNewsEvent extends NewsEvent {}
+
+class SearchNewsEvent extends NewsEvent {
+  final String query;
+
+  const SearchNewsEvent(this.query);
+
+  @override
+  List<Object> get props => [query];
+}

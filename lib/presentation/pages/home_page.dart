@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 
 import '../bloc/news/news_bloc.dart';
-import '../bloc/news/news_event.dart';
-import '../bloc/news/news_state.dart';
+import '../widgets/news_card.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/theme_provider.dart';
 import 'news_detail_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -15,6 +16,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -22,35 +26,98 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _loadNews() {
-    context.read<NewsBloc>().add(GetNewsEvent());
+    if (mounted) {
+      context.read<NewsBloc>().add(GetNewsEvent());
+    }
   }
 
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-      
-      if (difference.inDays > 0) {
-        return '${difference.inDays} hari lalu';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours} jam lalu';
-      } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes} menit lalu';
-      } else {
-        return 'Baru saja';
-      }
-    } catch (e) {
-      return dateStr;
+  void _searchNews(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    if (mounted) {
+      context.read<NewsBloc>().add(SearchNewsEvent(query));
+    }
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchQuery = '';
+      _searchController.clear();
+    });
+    if (mounted) {
+      context.read<NewsBloc>().add(GetNewsEvent());
     }
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("DigiNews"),
+        title: _searchQuery.isEmpty
+            ? const Text(
+                "DigiNews",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              )
+            : TextField(
+                controller: _searchController,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Cari berita...',
+                  hintStyle: TextStyle(
+                    color: Colors.white70,
+                  ),
+                  border: InputBorder.none,
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.white70,
+                  ),
+                ),
+                onChanged: _searchNews,
+                autofocus: true,
+              ),
         actions: [
+          IconButton(
+            icon: Icon(themeProvider.getThemeIcon()),
+            tooltip: _getTooltip(themeProvider.themeMode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+IconButton(
+  icon: Icon(
+    _searchQuery.isNotEmpty ? Icons.close : Icons.search,
+  ),
+  onPressed: () {
+    if (_searchQuery.isNotEmpty) {
+      _clearSearch();
+    } else {
+      setState(() {
+        _searchQuery = ' ';
+      });
+      // ✅ Pakai WidgetsBinding
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          FocusScope.of(context).requestFocus();
+        }
+      });
+    }
+  },
+),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadNews,
@@ -75,196 +142,43 @@ class _HomePageState extends State<HomePage> {
         },
         builder: (context, state) {
           if (state is NewsLoading) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return _buildLoadingShimmer();
           }
 
           if (state is NewsLoaded) {
-            if (state.news.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.newspaper,
-                      size: 64,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Tidak ada berita',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Coba refresh untuk memuat berita',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _loadNews,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Refresh'),
-                    ),
-                  ],
-                ),
-              );
+            final filteredNews = _searchQuery.isNotEmpty
+                ? state.news.where((news) =>
+                    news.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                    news.source.toLowerCase().contains(_searchQuery.toLowerCase())
+                  ).toList()
+                : state.news;
+
+            if (filteredNews.isEmpty) {
+              return _buildEmptySearchState();
             }
 
             return RefreshIndicator(
               onRefresh: () async {
                 _loadNews();
-                await Future.delayed(
-                  const Duration(milliseconds: 500),
-                );
+                await Future.delayed(const Duration(milliseconds: 500));
               },
               child: ListView.builder(
                 key: const PageStorageKey('news_list'),
-                itemCount: state.news.length,
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: filteredNews.length,
+                padding: const EdgeInsets.all(16),
                 itemBuilder: (context, index) {
-                  final news = state.news[index];
-
-                  return Card(
-                    key: ValueKey(news.url),
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => NewsDetailPage(
-                              news: news,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ✅ Gambar dengan CachedNetworkImage
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: news.image.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: news.image,
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(
-                                        width: 80,
-                                        height: 80,
-                                        color: Colors.grey.shade300,
-                                        child: const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      errorWidget: (context, url, error) => Container(
-                                        width: 80,
-                                        height: 80,
-                                        color: Colors.grey.shade300,
-                                        child: const Icon(
-                                          Icons.broken_image,
-                                          size: 30,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      width: 80,
-                                      height: 80,
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.image,
-                                        size: 30,
-                                      ),
-                                    ),
-                            ),
-                            
-                            const SizedBox(width: 12),
-                            
-                            // Content
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    news.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.source,
-                                        size: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          news.source,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.access_time,
-                                        size: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _formatDate(news.publishedAt),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  final news = filteredNews[index];
+                  
+                  return NewsCard(
+                    news: news,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NewsDetailPage(news: news),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),
@@ -272,37 +186,188 @@ class _HomePageState extends State<HomePage> {
           }
 
           if (state is NewsError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64,
-                    color: Colors.red.shade300,
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      state.message,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: _loadNews,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Coba Lagi'),
-                  ),
-                ],
-              ),
-            );
+            return _buildErrorState(state.message);
           }
 
           return const SizedBox();
         },
+      ),
+    );
+  }
+
+  String _getTooltip(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Switch to Dark Mode';
+      case ThemeMode.dark:
+        return 'Switch to System Mode';
+      default:
+        return 'Switch to Light Mode';
+    }
+  }
+
+  // ✅ Empty Search State
+  Widget _buildEmptySearchState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.search_off,
+              size: 50,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Berita tidak ditemukan',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Coba dengan kata kunci lain',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _clearSearch,
+            icon: const Icon(Icons.clear),
+            label: const Text('Bersihkan Pencarian'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Loading Shimmer
+  Widget _buildLoadingShimmer() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 200,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 100,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ Error State
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline,
+              size: 50,
+              color: Colors.red.shade300,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Oops! Terjadi Kesalahan',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadNews,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Coba Lagi'),
+          ),
+        ],
       ),
     );
   }
