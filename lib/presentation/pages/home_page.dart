@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../bloc/news/news_bloc.dart';
 import '../bloc/news/news_event.dart';
@@ -117,12 +118,12 @@ class _HomePageState extends State<HomePage> {
             }
 
             return RefreshIndicator(
-onRefresh: () async {
-  _loadNews();
-  await Future.delayed(
-    const Duration(milliseconds: 500),
-  );
-},
+              onRefresh: () async {
+                _loadNews();
+                await Future.delayed(
+                  const Duration(milliseconds: 500),
+                );
+              },
               child: ListView.builder(
                 key: const PageStorageKey('news_list'),
                 itemCount: state.news.length,
@@ -131,7 +132,7 @@ onRefresh: () async {
                   final news = state.news[index];
 
                   return Card(
-                    key: ValueKey(news.url), // ✅ Pakai url sebagai key
+                    key: ValueKey(news.url),
                     margin: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
@@ -157,43 +158,38 @@ onRefresh: () async {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Gambar
+                            // ✅ Gambar dengan CachedNetworkImage
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: news.image.isNotEmpty
-                                  ? Image.network(
-                                      news.image,
+                                  ? CachedNetworkImage(
+                                      imageUrl: news.image,
                                       width: 80,
                                       height: 80,
                                       fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return Container(
-                                          width: 80,
-                                          height: 80,
-                                          color: Colors.grey.shade300,
-                                          child: const Center(
-                                            child: SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
+                                      placeholder: (context, url) => Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey.shade300,
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
                                           ),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          width: 80,
-                                          height: 80,
-                                          color: Colors.grey.shade300,
-                                          child: const Icon(
-                                            Icons.broken_image,
-                                            size: 30,
-                                          ),
-                                        );
-                                      },
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: Colors.grey.shade300,
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          size: 30,
+                                        ),
+                                      ),
                                     )
                                   : Container(
                                       width: 80,
