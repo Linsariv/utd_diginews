@@ -14,14 +14,16 @@ class NewsRemoteDatasourceImpl implements NewsRemoteDatasource {
       ApiConfig.topHeadlines,
       queryParameters: {
         'country': 'id',
+        'lang': 'id',
+        'max': 10,
         'apikey': ApiConfig.apiKey,
       },
     );
 
-    final List articles = response.data['articles'];
+final List<dynamic> articles = response.data['articles'];
 
-    return articles
-        .map((e) => NewsModel.fromJson(e))
-        .toList();
+return articles
+    .map((e) => NewsModel.fromJson(e))
+    .toList();
   }
 }
